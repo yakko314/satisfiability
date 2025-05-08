@@ -22,12 +22,13 @@ def run_sat_solver_on_folder(folder_path, metoda):
             print(f"Error running sat_solver.py with file: {file_name}")
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
         print("Usage: python batch_runner.py [dp|dpll|res] [folder]")
+        print("By default, uses folder \"inputs/\"")
         sys.exit(1)
 
-    folder = sys.argv[2].lower()
     metoda = sys.argv[1]
+    folder = sys.argv[2] if len(sys.argv) == 3 else 'inputs'
 
     if metoda not in ["dp", "dpll", "res"]:
         print("Methods needs to be one of the following: dp, dpll, res")
