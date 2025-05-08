@@ -2,14 +2,15 @@ import sys
 import time
 import resource
 from copy import deepcopy
-
+from itertools import combinations
 
 TIME_LIMIT = 10  # seconds
-PRINT_INTERVAL = 1_000_000  # Print progress every million ops
+PRINT_INTERVAL = 1000000  # Print progress every million ops
 
 ops = 0
 last_print = 0
 start_time = time.time()
+start_cpu = resource.getrusage(resource.RUSAGE_SELF)
 
 def check_time():
     global ops, last_print
@@ -123,30 +124,92 @@ def dpll(clauses, assignment={}):
             return True
     return False
 
-def resolution(clauses):
-    new = set()
-    clause_set = set(tuple(sorted(c)) for c in clauses)
-    while True:
-        pairs = [(c1, c2) for i, c1 in enumerate(clauses)
-                          for c2 in clauses[i+1:]]
+def resolution(clauses, max_iterations=1000, max_clauses=1_000_000):
+    
+    def resolve(clause1, clause2):
+        for literal in clause1:
+            if -literal in clause2:
+                # Create new clause by combining and removing complementary literals
+                new_clause = set(clause1 + clause2)
+                new_clause.discard(literal)
+                new_clause.discard(-literal)
+                return sorted(new_clause)  # Return sorted for consistency
+        return None
 
-        for (c1, c2) in pairs:
-            for lit in c1:
-                check_time()
-                if -lit in c2:
-                    res = list(set(c1 + c2))
-                    res = [l for l in res if l != lit and l != -lit]
-                    res_clause = tuple(sorted(set(res)))
-                    if not res:
-                        return False
-                    new.add(res_clause)
-
-        if new.issubset(clause_set):
+    
+    clause_set = {tuple(sorted(c)) for c in clauses}
+    seen_clauses = set(clause_set)  # Track all clauses ever generated
+    iteration = 0
+    
+    while iteration < max_iterations:
+        iteration += 1
+        check_time() 
+        
+        if len(clause_set) > max_clauses:
+            print(f"Clause limit reached ({max_clauses})")
+            return None
+            
+        new_clauses = set()
+        pairs = combinations(clause_set, 2)
+        
+        for c1, c2 in pairs:
+            check_time()  # Check during resolution steps
+            resolvent = resolve(list(c1), list(c2))
+            
+            if resolvent is not None:
+                if not resolvent:  # Empty clause found
+                    return False
+                    
+                resolvent_tuple = tuple(resolvent)
+                if resolvent_tuple not in seen_clauses:
+                    new_clauses.add(resolvent_tuple)
+                    seen_clauses.add(resolvent_tuple)
+        
+        # No new clauses - satisfiable
+        if not new_clauses:
             return True
-        clause_set.update(new)
-        clauses = list(clause_set)
+            
+        clause_set.update(new_clauses)
+        
+        # Optional progress reporting
+        if iteration % 100 == 0:
+            print(f"Iteration {iteration}: {len(clause_set)} clauses")
+    
+    print(f"Max iterations reached ({max_iterations})")
+    return None
 
-# Entry point
+def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, cpu_usage, result):
+    import os
+    import csv
+    
+    # Create benchmarks directory if it doesn't exist
+    os.makedirs("benchmarks", exist_ok=True)
+    
+    # Get the base filename without path or extension
+    base_name = os.path.splitext(os.path.basename(input_filename))[0]
+    csv_filename = f"benchmarks/{base_name}_benchmark.csv"
+    
+    # Prepare the data row
+    data = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "input_file": input_filename,
+        "method": method,
+        "operations": ops,
+        "wall_time_sec": f"{wall_time:.4f}",
+        "cpu_time_sec": f"{cpu_time:.4f}",
+        "cpu_usage_percent": f"{cpu_usage:.1f}" if cpu_usage is not None else "N/A",
+        "result": str(result)
+    }
+    
+    # Write to CSV (create file with headers if it doesn't exist)
+    file_exists = os.path.isfile(csv_filename)
+    with open(csv_filename, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=data.keys())
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(data)
+
+# Then modify your main block to use this function:
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python sat_solver.py [dp|dpll|res] <input_file>")
@@ -154,6 +217,7 @@ if __name__ == "__main__":
 
     method = sys.argv[1].lower()
     input_file = sys.argv[2]
+    result = None
 
     try:
         variables, clauses = read_input(input_file)
@@ -171,15 +235,26 @@ if __name__ == "__main__":
             sys.exit(1)
     except TimeoutError as e:
         print(f"[TIMEOUT] {e}")
+        result = "Timeout"
     except RuntimeError as e:
         print(f"[ERROR] {e}")
+        result = "Error"
 
     # Benchmark report
+    MIN_TIME_FOR_ACCURATE_MEASUREMENT = 0.01  # 10 milliseconds
     wall_time = time.time() - start_time
-    cpu_time = resource.getrusage(resource.RUSAGE_SELF).ru_utime
-    cpu_usage = (cpu_time / wall_time) * 100 if wall_time > 0 else 0
+    cpu_time = resource.getrusage(resource.RUSAGE_SELF).ru_utime - start_cpu.ru_utime
+    cpu_usage = min((cpu_time / wall_time) * 100, 100) if wall_time >= MIN_TIME_FOR_ACCURATE_MEASUREMENT else None
+    
+    # Print to console
     print(f"\n[Benchmark]")
     print(f"Total operations: {ops:,}")
-    print(f"Wall time: {wall_time:.2f} seconds")
-    print(f"CPU time: {cpu_time:.2f} seconds")
-    print(f"CPU usage: {cpu_usage:.2f}%")
+    print(f"Wall time: {wall_time:.4f} seconds")
+    print(f"CPU time: {cpu_time:.4f} seconds")
+    if cpu_usage is not None:
+        print(f"CPU usage: {cpu_usage:.1f}%")
+    else:
+        print("CPU usage: [Not shown for very short runs]")
+    
+    # Write to CSV
+    write_benchmark_to_csv(input_file, method, ops, wall_time, cpu_time, cpu_usage, result)
