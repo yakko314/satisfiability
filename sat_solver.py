@@ -28,19 +28,28 @@ def print_progress():
 def read_input(filename):
     with open(filename, 'r') as f:
         lines = [line.strip() for line in f if line.strip()]
+
     variables = []
     clauses = []
+
     for line in lines:
-        if line.startswith('c') or line == '':
+        if line.startswith('c') or line.startswith('%') or line == '0' or line == '':
             continue
         if line.startswith('p'):
             _, _, var_count, _ = line.split()
             variables = list(range(1, int(var_count) + 1))
         else:
-            clause = list(map(int, line.split()))
-            clause = clause[:-1] if clause[-1] == 0 else clause
+            tokens = line.split()
+            # skip if line doesn't contain valid literals
+            if all(token in {'0', '%'} for token in tokens):
+                continue
+            clause = list(map(int, tokens))
+            if clause and clause[-1] == 0:
+                clause = clause[:-1]
             clauses.append(clause)
+
     return variables, clauses
+
 
 def eval_clause(clause, assignment):
     return any((lit > 0 and assignment.get(abs(lit), False)) or
@@ -52,16 +61,19 @@ def davis_putnam(clauses, variables):
         neg_clauses = [c for c in clauses if -var in c]
         other_clauses = [c for c in clauses if var not in c and -var not in c]
 
-        resolvents = []
+        resolvents = set()
         for pc in pos_clauses:
             for nc in neg_clauses:
                 check_time()
-                res = list(set(pc + nc) - {var, -var})
+                res = set(pc + nc) - {var, -var}
+                # Skip tautologies (e.g. [x, -x, y])
+                if any(-lit in res for lit in res):
+                    continue
                 if not res:
                     return None
-                resolvents.append(res)
+                resolvents.add(tuple(sorted(res)))
 
-        return other_clauses + resolvents
+        return other_clauses + [list(r) for r in resolvents]
 
     for var in variables:
         clauses = eliminate(clauses, var)
@@ -77,19 +89,35 @@ def dpll(clauses, assignment={}):
         while changed:
             check_time()
             changed = False
-            for clause in clauses:
-                if len(clause) == 1:
-                    lit = clause[0]
-                    val = lit > 0
-                    var = abs(lit)
-                    if var in assignment and assignment[var] != val:
+            unit_clauses = [c for c in clauses if len(c) == 1]
+            for clause in unit_clauses:
+                lit = clause[0]
+                val = lit > 0
+                var = abs(lit)
+                if var in assignment:
+                    if assignment[var] != val:
                         return None
-                    if var not in assignment:
-                        assignment[var] = val
-                        clauses = simplify(clauses, var, val)
-                        if clauses is None:
-                            return None
-                        changed = True
+                else:
+                    assignment[var] = val
+                    clauses = simplify(clauses, var, val)
+                    if clauses is None:
+                        return None
+                    changed = True
+        return clauses
+
+    def pure_literal_assign(clauses, assignment):
+        literal_count = {}
+        for clause in clauses:
+            for lit in clause:
+                literal_count[lit] = literal_count.get(lit, 0) + 1
+
+        for lit in list(literal_count):
+            if -lit not in literal_count and abs(lit) not in assignment:
+                val = lit > 0
+                assignment[abs(lit)] = val
+                clauses = simplify(clauses, abs(lit), val)
+                if clauses is None:
+                    return None
         return clauses
 
     def simplify(clauses, var, val):
@@ -104,7 +132,13 @@ def dpll(clauses, assignment={}):
             new_clauses.append(new_clause)
         return new_clauses
 
-    clauses = unit_propagate(deepcopy(clauses), assignment)
+    clauses = deepcopy(clauses)
+    assignment = assignment.copy()
+
+    clauses = unit_propagate(clauses, assignment)
+    if clauses is None:
+        return False
+    clauses = pure_literal_assign(clauses, assignment)
     if clauses is None:
         return False
     if not clauses:
@@ -125,66 +159,64 @@ def dpll(clauses, assignment={}):
     return False
 
 def resolution(clauses, max_iterations=1000, max_clauses=1_000_000):
-    
     def resolve(clause1, clause2):
         for literal in clause1:
             if -literal in clause2:
-                # Create new clause by combining and removing complementary literals
                 new_clause = set(clause1 + clause2)
                 new_clause.discard(literal)
                 new_clause.discard(-literal)
-                return sorted(new_clause)  # Return sorted for consistency
+                if any(-lit in new_clause for lit in new_clause):
+                    return None  # Tautology
+                return sorted(new_clause)
         return None
 
-    
     clause_set = {tuple(sorted(c)) for c in clauses}
-    seen_clauses = set(clause_set)  # Track all clauses ever generated
+    seen_clauses = set(clause_set)
+    clause_list = list(clause_set)
     iteration = 0
-    
+
     while iteration < max_iterations:
         iteration += 1
-        check_time() 
-        
+        check_time()
+
         if len(clause_set) > max_clauses:
             print(f"Clause limit reached ({max_clauses})")
             return None
-            
+
         new_clauses = set()
-        pairs = combinations(clause_set, 2)
-        
-        for c1, c2 in pairs:
-            check_time()  # Check during resolution steps
-            resolvent = resolve(list(c1), list(c2))
-            
-            if resolvent is not None:
-                if not resolvent:  # Empty clause found
-                    return False
-                    
-                resolvent_tuple = tuple(resolvent)
-                if resolvent_tuple not in seen_clauses:
-                    new_clauses.add(resolvent_tuple)
-                    seen_clauses.add(resolvent_tuple)
-        
-        # No new clauses - satisfiable
+        for i in range(len(clause_list)):
+            for j in range(i + 1, len(clause_list)):
+                c1, c2 = clause_list[i], clause_list[j]
+                check_time()
+                resolvent = resolve(list(c1), list(c2))
+                if resolvent is not None:
+                    if not resolvent:
+                        return False
+                    resolvent_tuple = tuple(resolvent)
+                    if resolvent_tuple not in seen_clauses:
+                        new_clauses.add(resolvent_tuple)
+                        seen_clauses.add(resolvent_tuple)
+
         if not new_clauses:
             return True
-            
+
+        clause_list.extend(new_clauses)
         clause_set.update(new_clauses)
-        
-        # Optional progress reporting
+
         if iteration % 100 == 0:
             print(f"Iteration {iteration}: {len(clause_set)} clauses")
-    
+
     print(f"Max iterations reached ({max_iterations})")
     return None
 
-def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, cpu_usage, result):
+
+def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, memory_usage_mb, result):
     import os
     import csv
-    
+
     os.makedirs("benchmarks", exist_ok=True)
     csv_filename = "benchmarks.csv"
-    
+
     data = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "input_file": input_filename,
@@ -192,11 +224,10 @@ def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, cpu
         "operations": ops,
         "wall_time_sec": f"{wall_time:.4f}",
         "cpu_time_sec": f"{cpu_time:.4f}",
-        "cpu_usage_percent": f"{cpu_usage:.1f}" if cpu_usage is not None else "N/A",
+        "memory_usage_mb": f"{memory_usage_mb:.2f}",
         "result": str(result)
     }
-    
-    # Write to CSV (create file with headers if it doesn't exist)
+
     file_exists = os.path.isfile(csv_filename)
     with open(csv_filename, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=data.keys())
@@ -234,21 +265,15 @@ if __name__ == "__main__":
         print(f"[ERROR] {e}")
         result = "Error"
 
-    # Benchmark report
-    MIN_TIME_FOR_ACCURATE_MEASUREMENT = 0.01  # 10 milliseconds
     wall_time = time.time() - start_time
     cpu_time = resource.getrusage(resource.RUSAGE_SELF).ru_utime - start_cpu.ru_utime
-    cpu_usage = min((cpu_time / wall_time) * 100, 100) if wall_time >= MIN_TIME_FOR_ACCURATE_MEASUREMENT else None
-    
-    # Print to console
+    memory_usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    memory_usage_mb = memory_usage_kb / 1024  # Convert to MB (platform dependent)
+
     print(f"\n[Benchmark]")
     print(f"Total operations: {ops:,}")
     print(f"Wall time: {wall_time:.4f} seconds")
     print(f"CPU time: {cpu_time:.4f} seconds")
-    if cpu_usage is not None:
-        print(f"CPU usage: {cpu_usage:.1f}%")
-    else:
-        print("CPU usage: [Not shown for very short runs]")
-    
-    # Write to CSV
-    write_benchmark_to_csv(input_file, method, ops, wall_time, cpu_time, cpu_usage, result)
+    print(f"Memory usage: {memory_usage_mb:.2f} MB")
+
+    write_benchmark_to_csv(input_file, method, ops, wall_time, cpu_time, memory_usage_mb, result)
