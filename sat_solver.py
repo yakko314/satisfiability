@@ -182,14 +182,9 @@ def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, cpu
     import os
     import csv
     
-    # Create benchmarks directory if it doesn't exist
     os.makedirs("benchmarks", exist_ok=True)
+    csv_filename = "benchmarks.csv"
     
-    # Get the base filename without path or extension
-    base_name = os.path.splitext(os.path.basename(input_filename))[0]
-    csv_filename = f"benchmarks/{base_name}_benchmark.csv"
-    
-    # Prepare the data row
     data = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "input_file": input_filename,
@@ -209,7 +204,6 @@ def write_benchmark_to_csv(input_filename, method, ops, wall_time, cpu_time, cpu
             writer.writeheader()
         writer.writerow(data)
 
-# Then modify your main block to use this function:
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python sat_solver.py [dp|dpll|res] <input_file>")

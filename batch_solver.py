@@ -13,11 +13,11 @@ def run_sat_solver_on_folder(folder_path, methods):
         print(f"No .cnf files found in folder '{folder_path}'.")
         return
 
-    for method in methods:
-        print(f"\n=== Running method: {method} ===")
-        for file_name in input_files:
-            input_path = os.path.join(folder_path, file_name)
-            print(f"\n--- Running on file: {file_name} ---")
+    for file_name in input_files:
+        input_path = os.path.join(folder_path, file_name)
+        print(f"\n--- Running on file: {file_name} ---")
+        for method in methods:
+            print(f"\n=== Running method: {method} ===")
             try:
                 subprocess.run(["python", "sat_solver.py", method, input_path], check=True)
             except subprocess.CalledProcessError:
@@ -25,7 +25,7 @@ def run_sat_solver_on_folder(folder_path, methods):
 
 if __name__ == '__main__':
     if len(sys.argv) > 3:
-        print("Usage: python batch_runner.py [method] [folder]")
+        print("Usage: python batch_runner.py [methods] [folder]")
         print("Methods: dp, dpll, res (default: run all)")
         print("Folder defaults to 'inputs/' if not specified")
         sys.exit(1)
