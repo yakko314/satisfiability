@@ -16,13 +16,13 @@ def get_unique_filename(folder, tag):
         index += 1
 
 def generate_input_file(n_vars, n_clauses, min_clause_len=None, fixed_clause_len=None,
-                        unsat_chance=0.0, folder='inputs'):
+                        folder='inputs'):
     clause_len_desc = (
         f"exact{fixed_clause_len}" if fixed_clause_len else
         f"range{min_clause_len}_to_{n_vars}" if min_clause_len else
         f"rand1_to_{n_vars}"
     )
-    tag_suffix = f"vars{n_vars}_clauses{n_clauses}_{clause_len_desc}_unsat{unsat_chance:.2f}"
+    tag_suffix = f"vars{n_vars}_clauses{n_clauses}_{clause_len_desc}"
     filename = get_unique_filename(folder, f"input_{tag_suffix}")
 
     with open(filename, 'w') as f:
@@ -30,22 +30,16 @@ def generate_input_file(n_vars, n_clauses, min_clause_len=None, fixed_clause_len
         f.write(f"c Number of variables: {n_vars}\n")
         f.write(f"c Intended number of clauses: {n_clauses}\n")
         f.write(f"c Clause length mode: {clause_len_desc}\n")
-        f.write(f"c Unsatisfiability injection chance: {unsat_chance}\n")
 
         actual_clauses = []
 
         for _ in range(n_clauses):
-            if unsat_chance > 0.0 and random.random() < unsat_chance:
-                var = random.randint(1, n_vars)
-                actual_clauses.append([var])
-                actual_clauses.append([-var])
-            else:
-                length = (
-                    fixed_clause_len if fixed_clause_len else
-                    random.randint(min_clause_len, n_vars) if min_clause_len else
-                    random.randint(1, n_vars)
-                )
-                actual_clauses.append(generate_clause(n_vars, length))
+            length = (
+                fixed_clause_len if fixed_clause_len else
+                random.randint(min_clause_len, n_vars) if min_clause_len else
+                random.randint(1, n_vars)
+            )
+            actual_clauses.append(generate_clause(n_vars, length))
 
         f.write(f"p cnf {n_vars} {len(actual_clauses)}\n")
         for clause in actual_clauses:
@@ -54,31 +48,37 @@ def generate_input_file(n_vars, n_clauses, min_clause_len=None, fixed_clause_len
     print(f"Generated: '{filename}' ({len(actual_clauses)} clauses)")
 
 if __name__ == '__main__':
-    import argparse
+    argc = len(sys.argv)
 
-    parser = argparse.ArgumentParser(description="CNF generator for DIMACS format.")
-    parser.add_argument("n_vars", type=int, help="Number of variables")
-    parser.add_argument("n_clauses", type=int, help="Number of base clauses")
-    parser.add_argument("clause_mode", nargs="?", help="Clause mode: fixed:k or min length (int)")
-    parser.add_argument("folder", nargs="?", default="inputs", help="Output folder")
-    parser.add_argument("--unsat-chance", type=float, default=0.0, help="Chance to inject contradictions (0.0 to 1.0)")
+    if argc < 3:
+        print("Usage: python generate_input.py <n_vars> <n_clauses> [gen_mode] [folder]")
+        print("  [gen_mode]: Optional. 'fixed:k' length or minimum clause length.")
+        print("  [folder]: Optional. Output folder name,  by default 'inputs/'.")
+        sys.exit(1)
 
-    args = parser.parse_args()
+    try:
+        n_vars = int(sys.argv[1])
+        n_clauses = int(sys.argv[2])
+    except ValueError:
+        sys.exit("Error: <n_vars> and <n_clauses> must be integers.")
 
-    n_vars = args.n_vars
-    n_clauses = args.n_clauses
-    folder = args.folder
-    unsat_chance = args.unsat_chance
+    gen_mode = sys.argv[3] if argc > 3 else None
+    folder = sys.argv[4] if argc > 4 else "inputs"
+
     fixed_clause_len = None
     min_clause_len = None
 
-    if args.clause_mode:
-        if args.clause_mode.startswith("fixed:"):
-            fixed_clause_len = int(args.clause_mode.split(":")[1])
-        elif args.clause_mode.isdigit():
-            min_clause_len = int(args.clause_mode)
+    if gen_mode:
+        if gen_mode.startswith("fixed:"):
+            try:
+                fixed_clause_len = int(gen_mode.split(":")[1])
+            except ValueError:
+                sys.exit("Error: Invalid fixed clause length format.")
+        elif gen_mode.isdigit():
+            min_clause_len = int(gen_mode)
+        else:
+            sys.exit("Error: gen_mode must be 'fixed:k' or an integer.")
 
-    # Validation
     if n_vars <= 0 or n_clauses <= 0:
         sys.exit("Error: n_vars and n_clauses must be > 0")
     if fixed_clause_len and (fixed_clause_len <= 0 or fixed_clause_len > n_vars):
@@ -86,4 +86,4 @@ if __name__ == '__main__':
     if min_clause_len and (min_clause_len <= 0 or min_clause_len > n_vars):
         sys.exit("Error: min clause length must be 1 <= k <= n_vars")
 
-    generate_input_file(n_vars, n_clauses, min_clause_len, fixed_clause_len, unsat_chance, folder)
+    generate_input_file(n_vars, n_clauses, min_clause_len, fixed_clause_len, folder)
