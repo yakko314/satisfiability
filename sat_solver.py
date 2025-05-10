@@ -1,6 +1,8 @@
 import sys
 import time
 import resource
+import psutil
+
 from copy import deepcopy
 from itertools import combinations
 
@@ -21,11 +23,14 @@ def check_time():
     if time.time() - start_time > TIME_LIMIT:
         raise TimeoutError(f"Time limit of {TIME_LIMIT} seconds exceeded at {ops:,} operations.")
 
+def get_memory_usage_mb():
+    process = psutil.Process()
+    return process.memory_info().rss / (1024 * 1024)
+    
 def print_progress():
     elapsed = time.time() - start_time
-    usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    memory_mb = usage_kb / 1024  # May vary by OS: KB on Linux, bytes on macOS
-    print(f"[Progress] Ops: {ops:,} | Elapsed: {elapsed:.2f} sec | Mem: {memory_mb:.2f} MB")
+    mem_mb = get_memory_usage_mb()
+    print(f"[Progress] Ops: {ops:,} | Elapsed: {elapsed:.2f} sec | Mem: {mem_mb:.2f} MB")
 
 
 def read_input(filename):
