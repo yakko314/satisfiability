@@ -23,7 +23,10 @@ def check_time():
 
 def print_progress():
     elapsed = time.time() - start_time
-    print(f"[Progress] Ops: {ops:,} | Elapsed: {elapsed:.2f} sec")
+    usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    memory_mb = usage_kb / 1024  # May vary by OS: KB on Linux, bytes on macOS
+    print(f"[Progress] Ops: {ops:,} | Elapsed: {elapsed:.2f} sec | Mem: {memory_mb:.2f} MB")
+
 
 def read_input(filename):
     with open(filename, 'r') as f:
