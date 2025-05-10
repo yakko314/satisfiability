@@ -44,8 +44,8 @@ def run_sat_solver_on_folder(folder_path, methods):
 if __name__ == '__main__':
     if len(sys.argv) > 3:
         print("Usage: python batch_runner.py [method] [folder]")
-        print("Methods: dp, dpll, res (default: run all)")
-        print("Folder defaults to 'inputs/' if not specified")
+        print("  [method]: Optional. dp, dpll or res; By default runs all of them.")
+        print("  [folder]: Optional. Input folder, by default 'inputs/'.")
         sys.exit(1)
 
     all_methods = ["dp", "dpll", "res"]
