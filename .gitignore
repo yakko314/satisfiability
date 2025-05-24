@@ -1,3 +1,2 @@
-inputs/
-benchmarks/
-benchmarks.csv
+inputs/random/backup
+script.py

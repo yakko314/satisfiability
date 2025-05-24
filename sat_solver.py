@@ -6,7 +6,7 @@ import psutil
 from copy import deepcopy
 from itertools import combinations
 
-TIME_LIMIT = 9999999  # seconds
+TIME_LIMIT = 10  # seconds
 PRINT_INTERVAL = 1000000  # Print progress every million ops
 
 ops = 0

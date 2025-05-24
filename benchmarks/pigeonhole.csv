@@ -1,0 +1,4 @@
+timestamp,input_file,method,operations,wall_time_sec,cpu_time_sec,memory_usage_mb,result
+2025-05-12 01:19:27,inputs/pigeonhole34.cnf,dp,488,0.0012,0.0011,18.40,False
+2025-05-12 01:19:27,inputs/pigeonhole34.cnf,dpll,498,0.0009,0.0009,18.40,False
+2025-05-12 01:19:37,inputs/pigeonhole34.cnf,res,6976094,10.0336,9.9713,53.45,Timeout
