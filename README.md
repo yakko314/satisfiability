@@ -23,6 +23,7 @@ python sat_solver.py [method] [input_file]
 - `[input_file]` is the name of the text file containing the formula in CNF format, e.g., `example.txt`
 
 Note: Timeout limit can be modified by altering `TIME_LIMIT` in `sat_solver.py`. 
+
 ---
 
 ### Input Generation
