@@ -15,7 +15,7 @@ The program is executed from the terminal by specifying the solving method and t
 python sat_solver.py [method] [input_file]
 ```
 
-### Parameters:
+#### Parameters:
 - `[method]` can be one of:
   - `dp` – for the Davis-Putnam algorithm
   - `dpll` – for the DPLL algorithm
@@ -24,6 +24,14 @@ python sat_solver.py [method] [input_file]
 
 Note: Timeout limit can be modified by altering `TIME_LIMIT` in `sat_solver.py`. 
 
+This program outputs the following information to the console:
+- The selected algorithm used for solving.
+- Intermediate progress updates (every 1,000,000 operations by default).
+- Current memory usage during execution.
+- At completion:
+  - The satisfiability result (`True` or `False`).
+  - Performance statistics, including total operations performed and total execution time.
+while also creating a `.csv` file with performance statistics.
 ---
 
 ### Input Generation
@@ -44,7 +52,7 @@ python generate_input.py <num_vars> <num_clauses> [gen_mode] [folder]
   - `k` (an integer) – clause length will be randomly chosen between `k` and `num_vars`
   - if omitted, clause lengths will be randomly chosen between `1` and `num_vars`
 - `[folder]` – the folder where the generated file will be saved (default: `inputs/`)
-
+- 
 The script automatically generates a file in **DIMACS CNF format** and includes descriptive metadata in the header as comments.
 
 ---
@@ -61,3 +69,4 @@ python batch_solver.py [method] [input_folder]
 - `[method]` – one of the solving methods defined in `sat_solver.py`. If this parameter is omitted, all methods will be executed.
 - `[input_folder]` – the name of the folder containing the input files (default: `inputs/`)
 
+Functions identically to `sat_solver.py`, just executes it in mass.
